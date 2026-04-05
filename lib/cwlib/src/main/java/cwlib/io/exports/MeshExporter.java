@@ -211,7 +211,10 @@ public class MeshExporter
                 if (mesh != null)
                     target.setNode(glb.getNodeIndex(Bone.getNameFromHash(mesh.getBones(),
                         animation.bones[pos].animHash)));
-                target.setNode(pos + 1);
+                if (mesh != null)
+                    target.setNode(glb.getNodeIndex(Bone.getNameFromHash(mesh.getBones(), animation.bones[pos].animHash)));
+                else
+                    target.setNode(pos + 1);
                 target.setPath("translation");
                 channel.setTarget(target);
                 AnimationSampler sampler = new AnimationSampler();
@@ -1073,6 +1076,7 @@ public class MeshExporter
                         float base = animation.getBaseWeight(i);
                         for (int j = 0; j < weights.length; ++j)
                             weights[j] = base;
+                        morphFrames[i] = weights;
                     }
                 }
 

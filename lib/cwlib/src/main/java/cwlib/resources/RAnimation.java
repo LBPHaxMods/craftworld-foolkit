@@ -302,14 +302,13 @@ public class RAnimation implements Resource
         }
 
         for (int i = 0; i < packedPosition.length; ++i)
-            packedPosition[i] = new Vector4f(stream.f16(), stream.f16(), stream.f16(), 1.0f);
+            packedPosition[i] = readPackedPosition(stream);
 
         for (int i = 0; i < packedScale.length; ++i)
-            packedScale[i] = new Vector4f(stream.f16(), stream.f16(), stream.f16(), 1.0f);
+            packedScale[i] = readPackedScale(stream);
 
         for (int i = 0; i < packedMorph.length; ++i)
-            packedMorph[i] = stream.f16();
-
+            packedMorph[i] = readPackedMorph(stream);
     }
 
     public int getLoopedFrame(int frame, boolean looped)
@@ -326,6 +325,40 @@ public class RAnimation implements Resource
         if (this.numFrames <= frame)
             return this.numFrames - 1;
         return frame;
+    }
+
+    private float readPackedScalar(MemoryInputStream stream)
+    {
+        return fat ? stream.f32() : stream.f16();
+    }
+
+    private Vector4f readPackedPosition(MemoryInputStream stream)
+    {
+        float x = readPackedScalar(stream);
+        float y = readPackedScalar(stream);
+        float z = readPackedScalar(stream);
+
+        return new Vector4f(
+                posOffset.x + (x * posScale.x),
+                posOffset.y + (y * posScale.y),
+                posOffset.z + (z * posScale.z),
+                1.0f
+        );
+    }
+
+    private Vector4f readPackedScale(MemoryInputStream stream)
+    {
+        return new Vector4f(
+                readPackedScalar(stream),
+                readPackedScalar(stream),
+                readPackedScalar(stream),
+                1.0f
+        );
+    }
+
+    private float readPackedMorph(MemoryInputStream stream)
+    {
+        return readPackedScalar(stream);
     }
 
     private void unpack(Vector4f[] out, Vector4f[] src, int animatedSize, int frame,
@@ -398,7 +431,7 @@ public class RAnimation implements Resource
 
         Vector3f translation = new Vector3f(pos.x, pos.y, pos.z);
         Quaternionf quaternion = new Quaternionf(rot.x, rot.y, rot.z, rot.w);
-        Vector3f scale = new Vector3f(sx.x, sx.y, sx.y);
+        Vector3f scale = new Vector3f(sx.x, sx.y, sx.z);
 
         return new Matrix4f().identity().translationRotateScale(
             translation,
@@ -663,6 +696,14 @@ public class RAnimation implements Resource
         return -1;
     }
 
+    private int getMorphAnimationIndex(int morphIndex)
+    {
+        for (int i = 0; i < this.morphsAnimated.length; ++i)
+            if ((this.morphsAnimated[i] & 0xff) == morphIndex)
+                return i;
+        return -1;
+    }
+
     public Vector3f getTranslationFrame(int animHash, int frame)
     {
         int index = this.getBoneIndex(animHash);
@@ -781,14 +822,24 @@ public class RAnimation implements Resource
 
     public float[] getMorphFrames(int index)
     {
-        if (index < 0 || index >= this.morphCount || !this.isAnimated(index)) return null;
+        if (index < 0 || index >= this.morphCount || !this.isAnimated(index))
+            return null;
+
+        int animIndex = getMorphAnimationIndex(index);
+
+        if (animIndex == -1)
+            return null;
+
         float[] frames = new float[this.numFrames];
         frames[0] = this.packedMorph[index];
-        for (int i = 1; i < this.numFrames; ++i)
-            frames[i] =
-                this.packedMorph[this.morphCount + ((i - 1) * this.morphsAnimated.length) + index];
-        return frames;
 
+        for (int i = 1; i < this.numFrames; ++i)
+        {
+            frames[i] =
+                    this.packedMorph[this.morphCount + ((i - 1) * this.morphsAnimated.length) + animIndex];
+        }
+
+        return frames;
     }
 
     @Override
